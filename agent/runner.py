@@ -4,9 +4,12 @@ ROOT = Path(__file__).resolve().parent.parent
 THIRD = ROOT / "3rd" / "gym-sts"
 sys.path.insert(0, str(THIRD))
 
+import time
 import argparse
 from gym_sts.envs.base import SlayTheSpireGymEnv
 from gym_sts.spaces.observations import ObservationError
+
+from llm_agent import LLMAgent
 
 def main():
     parser = argparse.ArgumentParser()
@@ -17,22 +20,26 @@ def main():
     parser.add_argument("--build_image", action="store_true")
     args = parser.parse_args()
 
-    if args.build_image:
-        SlayTheSpireGymEnv.build_image()
+    agent = LLMAgent()
 
     env = SlayTheSpireGymEnv(
-        args.lib_dir, args.mods_dir, args.out_dir, headless=args.headless
+        args.lib_dir, args.mods_dir, args.out_dir, headless=args.headless,
+        character= agent.character, ascension=agent.ascension, sts_seed = "0"
     )
     observation = env.reset()
-    # print(observation.state)
 
+    action = "state"
     while True:
-        action = input("Enter an action: ")
-        if not action:
-            print("No action given. Defaulting to STATE.")
-            action = "STATE"
         observation = env._do_action(action)
-        print(observation.state)
+
+        time.sleep(1)
+        observation = env._do_action("state")
+        # print(observation.state)
+
+        action = agent.get_action(observation)
+
+        act = input("Enter an action: ")
+
         try:
             commands = observation._available_commands
             print("AVAILABLE COMMANDS:")
@@ -40,7 +47,6 @@ def main():
         except ObservationError as e:
             print("ERROR")
             print(e)
-
 
 if __name__ == "__main__":
     main()
