@@ -1,0 +1,3 @@
+[submodule "3rd/gym-sts"]
+	path = 3rd/gym-sts
+	url = https://github.com/langsfang/gym-sts.git
