@@ -1,3 +1,6 @@
 [submodule "3rd/gym-sts"]
 	path = 3rd/gym-sts
 	url = https://github.com/langsfang/gym-sts.git
+[submodule "3rd/sts_lightspeed"]
+	path = 3rd/sts_lightspeed
+	url = https://github.com/langsfang/sts_lightspeed.git
