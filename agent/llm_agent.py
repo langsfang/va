@@ -15,6 +15,15 @@ class LLMAgent:
         self.actions = {
             "EVENT" : self._action_event,
             "MAP" : self._action_map,
+            "COMBAT_REWARD" : self._action_reward,
+            "CARD_REWARD" : self._action_card_reward,
+            "REST" : self._action_rest,
+            "SHOP_ROOM" : self._action_shop,
+            "SHOP_SCREEN" : self._action_shop,
+            "CHEST" : self._action_chest,
+            "GRID" : self._action_grid_select,
+            "HAND_SELECT" : self._action_hand_select,
+            "GAME_OVER" : self._action_game_over,
             "NONE": self._action_combat,
         }
 
@@ -49,6 +58,7 @@ class LLMAgent:
         return info
 
     def _enter_state(self, new_state: ContextState) -> None:
+        print(f"in state: {new_state}")
         if self.state is new_state:
             return
         self.state = new_state
@@ -71,15 +81,75 @@ class LLMAgent:
 
         ctx["available_command"] = obs._available_commands
         ctx["choice_list"] = obs.choice_list
-        print(json.dumps(ctx, indent=4))
+        print(json.dumps(ctx))
 
         act = self.evaluate_llm(ctx)
 
-        return ctx
+        return act
 
     def _action_combat(self, obs: Observation):
         self._enter_state(ContextState.COMBAT)
         ctx = self.get_general_info(obs.persistent_state.readable())
         act = self.evaluate_llm(ctx)
 
-        return ctx
+        return act
+
+    def _action_reward(self, obs: Observation):
+        self._enter_state(ContextState.REWARD)
+
+        # select reward one by one
+        act = "choose 0"
+
+        return act
+
+    def _action_card_reward(self, obs: Observation):
+        self._enter_state(ContextState.REWARD)
+
+        ctx = self.get_general_info(obs.persistent_state.readable())
+        act = self.evaluate_llm(ctx)
+
+        return act
+
+    def _action_rest(self, obs: Observation):
+        self._enter_state(ContextState.REST)
+
+        ctx = self.get_general_info(obs.persistent_state.readable())
+        act = self.evaluate_llm(ctx)
+
+        return act
+
+    def _action_shop(self, obs: Observation):
+        self._enter_state(ContextState.SHOP)
+
+        ctx = self.get_general_info(obs.persistent_state.readable())
+        act = self.evaluate_llm(ctx)
+
+        return act
+
+    def _action_chest(self, obs: Observation):
+        self._enter_state(ContextState.REWARD)
+
+        # select reward one by one
+        act = "choose 0"
+        return act
+
+    def _action_grid_select(self, obs: Observation):
+        # no change state, in order to keep the context
+
+        ctx = self.get_general_info(obs.persistent_state.readable())
+        act = self.evaluate_llm(ctx)
+
+        return act
+
+    def _action_hand_select(self, obs: Observation):
+        # no change state, in order to keep the context
+
+        ctx = self.get_general_info(obs.persistent_state.readable())
+        act = self.evaluate_llm(ctx)
+
+        return act
+
+    def _action_game_over(self, obs: Observation):
+        act = "choose 0"
+
+        return act
