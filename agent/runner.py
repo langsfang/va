@@ -28,7 +28,7 @@ def main():
     )
     observation = env.reset()
 
-    action = "state"
+    action = "choose 0" # click start
     while True:
         observation = env._do_action(action)
 
