@@ -5,6 +5,7 @@ THIRD = ROOT / "3rd" / "gym-sts"
 sys.path.insert(0, str(THIRD))
 
 import time
+import json
 import argparse
 from gym_sts.envs.base import SlayTheSpireGymEnv
 from gym_sts.spaces.observations import ObservationError
@@ -34,11 +35,14 @@ def main():
 
         time.sleep(1)
         observation = env._do_action("state")
+        with open(args.out_dir + "/obs.json", 'w') as json_file:
+            json_file.write(json.dumps(observation.state, indent=4))
+
         # print(observation.state)
 
         action = agent.get_action(observation)
 
-        act = input("Enter an action: ")
+        action = input("Enter an action: ")
 
         try:
             commands = observation._available_commands

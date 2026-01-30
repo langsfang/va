@@ -34,7 +34,7 @@ class LLMAgent:
         self.room_step = 0
 
         self.character = "IRONCLAD"
-        self.ascension = 0
+        self.ascension = 20
 
     def get_ctx(self) -> dict:
         return {
