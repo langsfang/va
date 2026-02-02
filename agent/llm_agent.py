@@ -1,6 +1,10 @@
 from gym_sts.spaces.observations import Observation
 from enum import Enum, auto
 import json
+from logger import Logger
+from prompts.event import EVENT_PROMPT
+from model import LLMModel
+
 class ContextState(Enum):
     EVENT = 0
     MAP = auto()
@@ -27,6 +31,10 @@ class LLMAgent:
             "NONE": self._action_combat,
         }
 
+        self.prompts = {
+            ContextState.EVENT : EVENT_PROMPT,
+        }
+
         self.hist = []
 
         self.state = ContextState.INVALID
@@ -36,6 +44,10 @@ class LLMAgent:
         self.character = "IRONCLAD"
         self.ascension = 20
 
+        self.logger = Logger("log")
+
+        self.skip_commands = ['key', 'click', 'wait', 'state']
+
     def get_ctx(self) -> dict:
         return {
             "character": self.character,
@@ -44,15 +56,68 @@ class LLMAgent:
 
     def get_action(self, obs: Observation):
 
+        if self.logger.need_replay():
+            return self.logger.replay()
+
+        act = self.fast_action(obs) # no need for LLM
+        if act:
+            self.logger.add(act)
+            return act
+
         print(obs.screen_type)
         act = self.actions.get(obs.screen_type)(obs)
     
-        act = "choose 0"
         print("play:", act)
+        self.logger.add(act)
         return act
+
+    def extract_action(self, resp: str) -> str:
+        target_key = "FinalAction"
+
+        data = None
+
+        start_index = resp.find(target_key)
+        if start_index == -1:
+            return ""
+        colon_index = resp.find(":", start_index)
+        if colon_index == -1:
+            return ""
+        
+        potential_json_str = resp[colon_index + 1:].strip()
+        
+        try:
+            decoder = json.JSONDecoder()
+            data, end_pos = decoder.raw_decode(potential_json_str)
+        except json.JSONDecodeError as e:
+            print(f"解析 JSON 失败: {e}")
+            return ""
+
+        if not data:
+            return ""
+
+        action = data.get("action")
+        idx = data.get("id")
+        ret = f"{action} {idx}"
+        return ret
     
     def evaluate_llm(self, ctx: dict) -> str:
-        return "choose 0"
+        sys = self.prompts.get(self.state, "")
+        user = json.dumps(ctx)
+
+        model = "gemini-3-flash-preview"
+        url = "https://generativelanguage.googleapis.com/v1beta/openai/"
+
+        llm = LLMModel(url, key, model)
+        messages = [
+            {"role": "system", "content": sys},
+            {"role": "user", "content": user}
+        ]
+
+        answer = llm.llm_stream(messages)
+        act = self.extract_action(answer)
+        print(act)
+
+        return act
 
     def get_general_info(self, info: dict) -> dict:
         return info
@@ -73,13 +138,33 @@ class LLMAgent:
         act = "choose 0"
         return act
 
+    def fast_action(self, obs: Observation):
+        ac = [i for i in obs._available_commands if not i in self.skip_commands]
+        cl = obs.choice_list
+
+        print("fast action")
+        print("="*10)
+        print(ac)
+        print(cl)
+        print("="*10)
+
+        if len(ac) == 1 and len(cl) == 0:
+            return ac[0]
+
+        if "confirm" in ac:
+            return "confirm"
+        elif "choose" in ac and len(cl) == 1:
+            return "choose 0"
+
+        return ""
+
     def _action_event(self, obs: Observation):
         self._enter_state(ContextState.EVENT)
         ctx = self.get_ctx()
         ctx["game_state"] = self.get_general_info(obs.persistent_state.readable())
         ctx["event_state"] = obs.event_state.readable()
 
-        ctx["available_command"] = obs._available_commands
+        ctx["available_command"] = [i for i in obs._available_commands if not i in self.skip_commands]
         ctx["choice_list"] = obs.choice_list
         print(json.dumps(ctx))
 

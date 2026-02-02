@@ -27,7 +27,7 @@ def main():
         args.lib_dir, args.mods_dir, args.out_dir, headless=args.headless,
         character= agent.character, ascension=agent.ascension, sts_seed = "0"
     )
-    observation = env.reset()
+    observation = env.reset(seed=0)
 
     action = "choose 0" # click start
     while True:
@@ -42,7 +42,7 @@ def main():
 
         action = agent.get_action(observation)
 
-        action = input("Enter an action: ")
+        #act = input("Enter an action: ")
 
         try:
             commands = observation._available_commands

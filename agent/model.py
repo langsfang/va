@@ -38,9 +38,9 @@ class LLMModel:
         return full_content
 
 def main():
-    model = "gpt-oss-120b"
-    url = "http://127.0.0.1:8080"
-    key = "no_key"
+    #model = "gpt-oss-120b"
+    #url = "http://127.0.0.1:8080"
+    #key = "no_key"
 
     llm = LLMModel(url, key, model)
     messages = [
