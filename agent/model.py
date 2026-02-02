@@ -38,10 +38,6 @@ class LLMModel:
         return full_content
 
 def main():
-    #model = "gemini-3-flash-preview"
-    #url = "https://generativelanguage.googleapis.com/v1beta/openai/"
-    #key = "AIzaSyChN0swFnfHZjA4-EzJU1O5amQO-vcxx0E"
-
     model = "gpt-oss-120b"
     url = "http://127.0.0.1:8080"
     key = "no_key"
