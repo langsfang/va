@@ -35,6 +35,7 @@ def main():
 
         time.sleep(1)
         observation = env._do_action("state")
+        time.sleep(1)
         with open(args.out_dir + "/obs.json", 'w') as json_file:
             json_file.write(json.dumps(observation.state, indent=4))
 
@@ -42,15 +43,8 @@ def main():
 
         action = agent.get_action(observation)
 
+        print(f"playing {action}")
         #act = input("Enter an action: ")
-
-        try:
-            commands = observation._available_commands
-            print("AVAILABLE COMMANDS:")
-            print(commands)
-        except ObservationError as e:
-            print("ERROR")
-            print(e)
 
 if __name__ == "__main__":
     main()

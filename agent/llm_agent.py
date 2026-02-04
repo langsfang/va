@@ -1,18 +1,14 @@
 from gym_sts.spaces.observations import Observation
-from enum import Enum, auto
 import json
+from context_state import ContextState
 from logger import Logger
 from prompts.event import EVENT_PROMPT
+from prompts.reward import REWARD_PROMPT
+from prompts.deck_eval import DECK_EVAL_PROMPT
 from model import LLMModel
-
-class ContextState(Enum):
-    EVENT = 0
-    MAP = auto()
-    COMBAT = auto()
-    REWARD = auto()
-    SHOP = auto()
-    REST = auto()
-    INVALID = auto()
+from map_feature import get_path_features
+from actors import Actor
+from utils import extract_json
 
 class LLMAgent:
     def __init__(self):
@@ -33,6 +29,7 @@ class LLMAgent:
 
         self.prompts = {
             ContextState.EVENT : EVENT_PROMPT,
+            ContextState.REWARD : REWARD_PROMPT,
         }
 
         self.hist = []
@@ -47,6 +44,8 @@ class LLMAgent:
         self.logger = Logger("log")
 
         self.skip_commands = ['key', 'click', 'wait', 'state']
+
+        self.actor = None
 
     def get_ctx(self) -> dict:
         return {
@@ -100,14 +99,29 @@ class LLMAgent:
         ret = f"{action} {idx}"
         return ret
     
-    def evaluate_llm(self, ctx: dict) -> str:
-        sys = self.prompts.get(self.state, "")
+    def deck_eval(self, ctx: dict) -> str:
+        sys = DECK_EVAL_PROMPT
         user = json.dumps(ctx)
 
-        model = "gemini-3-flash-preview"
-        url = "https://generativelanguage.googleapis.com/v1beta/openai/"
+        llm = LLMModel()
+        messages = [
+            {"role": "system", "content": sys},
+            {"role": "user", "content": user}
+        ]
 
-        llm = LLMModel(url, key, model)
+        answer = llm.llm_stream(messages)
+        strategy = extract_json(answer, "Strategy")
+        print(strategy)
+        return strategy
+
+    def evaluate_llm(self, ctx: dict) -> str:
+        sys = self.prompts.get(self.state, "")
+        if not sys:
+            assert(False)
+
+        user = json.dumps(ctx)
+
+        llm = LLMModel()
         messages = [
             {"role": "system", "content": sys},
             {"role": "user", "content": user}
@@ -128,13 +142,18 @@ class LLMAgent:
             return
         self.state = new_state
         self.hist.clear()
+        self.actor = Actor(new_state)
 
     def _action_map(self, obs: Observation):
         self._enter_state(ContextState.MAP)
 
-        ctx = self.get_general_info(obs.persistent_state.readable())
+        ctx = self.get_ctx()
+        ctx["game_state"] = self.get_general_info(obs.persistent_state.readable())
+        ctx["map_feature"] = get_path_features(obs.state.get("game_state").get("map"), 0, 0)
 
-        act = self.evaluate_llm(ctx)
+        print(json.dumps(ctx))
+
+        # act = self.evaluate_llm(ctx)
         act = "choose 0"
         return act
 
@@ -145,11 +164,16 @@ class LLMAgent:
         print("fast action")
         print("="*10)
         print(ac)
+        print("="*10)
         print(cl)
         print("="*10)
 
-        if len(ac) == 1 and len(cl) == 0:
-            return ac[0]
+        if len(cl) == 0:
+            if len(ac) == 1:
+                return ac[0]
+            real_action = [i for i in ac if i not in ["choose", "potion"]]
+            if len(real_action) == 1:
+                return real_action[0]
 
         if "confirm" in ac:
             return "confirm"
@@ -174,9 +198,11 @@ class LLMAgent:
 
     def _action_combat(self, obs: Observation):
         self._enter_state(ContextState.COMBAT)
-        ctx = self.get_general_info(obs.persistent_state.readable())
-        act = self.evaluate_llm(ctx)
 
+        act = self.actor.get_action(obs)
+
+        #ctx = self.get_general_info(obs.persistent_state.readable())
+        #act = self.evaluate_llm(ctx)
         return act
 
     def _action_reward(self, obs: Observation):
@@ -190,7 +216,17 @@ class LLMAgent:
     def _action_card_reward(self, obs: Observation):
         self._enter_state(ContextState.REWARD)
 
-        ctx = self.get_general_info(obs.persistent_state.readable())
+        ctx = self.get_ctx()
+        ctx["game_state"] = self.get_general_info(obs.persistent_state.readable())
+
+        ctx["choose_strategy"] = self.deck_eval(ctx)
+
+        ctx["card_reward"] = obs.card_reward_state.readable()
+
+        ctx["available_command"] = [i for i in obs._available_commands if not i in self.skip_commands]
+        ctx["choice_list"] = [{"id": i, "name": c} for i, c in enumerate(obs.choice_list)]
+        print(json.dumps(ctx))
+
         act = self.evaluate_llm(ctx)
 
         return act
