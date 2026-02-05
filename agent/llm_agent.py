@@ -138,6 +138,7 @@ class LLMAgent:
 
     def _enter_state(self, new_state: ContextState) -> None:
         print(f"in state: {new_state}")
+        self.logger.note(f"in state {new_state}")
         if self.state is new_state:
             return
         self.state = new_state
@@ -147,14 +148,18 @@ class LLMAgent:
     def _action_map(self, obs: Observation):
         self._enter_state(ContextState.MAP)
 
+        self.logger.note(f"new room {self.room_num}")
         ctx = self.get_ctx()
         ctx["game_state"] = self.get_general_info(obs.persistent_state.readable())
         ctx["map_feature"] = get_path_features(obs.state.get("game_state").get("map"), 0, 0)
 
         print(json.dumps(ctx))
+        self.logger.note(ctx.get("game_state").get("health"))
 
         # act = self.evaluate_llm(ctx)
         act = "choose 0"
+
+        self.room_num += 1
         return act
 
     def fast_action(self, obs: Observation):

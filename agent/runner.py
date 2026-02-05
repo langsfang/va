@@ -32,10 +32,8 @@ def main():
     action = "choose 0" # click start
     while True:
         observation = env._do_action(action)
-
-        time.sleep(1)
         observation = env._do_action("state")
-        time.sleep(1)
+
         with open(args.out_dir + "/obs.json", 'w') as json_file:
             json_file.write(json.dumps(observation.state, indent=4))
 
