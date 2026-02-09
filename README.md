@@ -17,3 +17,9 @@ mkdir build
 cd build
 cmake .. -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 ```
+
+## todo
+
+- StS DB
+- potion discard when slot is full
+- GameOver

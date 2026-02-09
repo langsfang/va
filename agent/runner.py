@@ -42,7 +42,8 @@ def main():
         action = agent.get_action(observation)
 
         print(f"playing {action}")
-        #act = input("Enter an action: ")
+        if not agent.is_replaying():
+            act = input("Enter an action: ")
 
 if __name__ == "__main__":
     main()

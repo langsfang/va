@@ -53,6 +53,9 @@ class LLMAgent:
             "ascension": self.ascension,
         }
 
+    def is_replaying(self):
+        return self.logger.need_replay()
+
     def get_action(self, obs: Observation):
 
         if self.logger.need_replay():
