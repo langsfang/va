@@ -199,6 +199,14 @@ class LLMAgent:
 
         print(f"fast action: next act: {self.next_act}")
         if self.next_act:
+            if self.next_act.startswith("next_turn_choose"):
+                card_name = self.next_act.split(" ")[1]
+                for i, name in enumerate(obs.choice_list):
+                    if card_name == name:
+                        self.next_act = None
+                        return f"choose {i}"
+                assert(False)
+
             act = self.next_act
             self.next_act = None
             return act
@@ -249,10 +257,11 @@ class LLMAgent:
     def _action_combat(self, obs: Observation):
         self._enter_state(ContextState.COMBAT)
 
-        act = self.actor.get_action(obs)
+        act, self.next_act = self.actor.get_action(obs, self.room_num, self.room_step)
 
         #ctx = self.get_general_info(obs.persistent_state.readable())
         #act = self.evaluate_llm(ctx)
+        self.room_step += 1
         return act
 
     def _action_reward(self, obs: Observation):
@@ -278,6 +287,8 @@ class LLMAgent:
         print(json.dumps(ctx))
 
         act = self.evaluate_llm(ctx)
+        if act == "skip":
+            self.next_act = "proceed"
 
         return act
 
@@ -344,6 +355,6 @@ class LLMAgent:
         return act
 
     def _action_game_over(self, obs: Observation):
-        act = "choose 0"
+        act = "over"
 
         return act
