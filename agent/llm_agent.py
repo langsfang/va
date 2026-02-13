@@ -12,9 +12,10 @@ from model import LLMModel
 from map_feature import get_path_features
 from actors import Actor
 from utils import extract_json
+from db import StSDB
 
 class LLMAgent:
-    def __init__(self):
+    def __init__(self, log_dir: str):
         self.actions = {
             "EVENT" : self._action_event,
             "MAP" : self._action_map,
@@ -36,6 +37,12 @@ class LLMAgent:
             ContextState.REST : REST_PROMPT,
             ContextState.SHOP : SHOP_PROMPT,
         }
+        import os
+        cdir = os.getcwd()
+        self.log_dir = f"{cdir}/{log_dir}"
+        os.makedirs(self.log_dir, exist_ok=True)
+
+        self.db = StSDB()
 
         self.hist = []
 
@@ -46,7 +53,7 @@ class LLMAgent:
         self.character = "IRONCLAD"
         self.ascension = 20
 
-        self.logger = Logger("log")
+        self.logger = Logger(f"{self.log_dir}/log")
 
         self.skip_commands = ['key', 'click', 'wait', 'state']
 
@@ -74,7 +81,6 @@ class LLMAgent:
             return self.logger.replay()
 
         act = self.fast_action(obs) # no need for LLM
-        print(f"---end of fast action: {act}--")
         if act:
             self.logger.add(act)
             return act
@@ -114,6 +120,8 @@ class LLMAgent:
             use = data.get("type")
             slot = data.get("potion_slot")
             ret = f"{action} {use} {slot}"
+        elif action == "skip":
+            ret = "skip"
         else:
             idx = data.get("id")
             if idx is not None:
@@ -151,7 +159,7 @@ class LLMAgent:
         self.hist.append({"role": "user", "content": user})
 
         # dump prompt
-        with open(f"logs/{self.room_num}-{self.room_step}-{self.state}", "w") as fn:
+        with open(f"{self.log_dir}/{self.room_num}-{self.room_step}-{self.state}", "w") as fn:
             for msg in self.hist:
                 fn.write(f"----{msg.get('role')}---\n")
                 fn.write(msg.get("content"))
@@ -168,16 +176,30 @@ class LLMAgent:
         return act
 
     def get_general_info(self, info: dict) -> dict:
+
+        deck = info.get("deck")
+        deck_info = [self.db.query_card(i.get("name")) for i in deck]
+        info["deck_info"] = deck_info
+
+        relics = info.get("relics")
+        relic_info = [self.db.query_relic(i) for i in relics]
+        info["relic_info"] = relic_info
+
+        potions = info.get("potions")
+        potion_info = [self.db.query_potion(i.get("potion")) for i in potions if i.get("potion") != "Potion Slot"]
+        if potion_info:
+            info["potion_info"] = relic_info
+
         return info
 
     def _enter_state(self, new_state: ContextState) -> None:
         print(f"in state: {new_state}")
-        self.logger.note(f"in state {new_state}")
+        #self.logger.note(f"in state {new_state}")
         if self.state is new_state:
             return
         self.state = new_state
         self.hist.clear()
-        self.actor = Actor(new_state)
+        self.actor = Actor(new_state, self.log_dir)
 
     def _action_map(self, obs: Observation):
         self._enter_state(ContextState.MAP)
@@ -197,7 +219,7 @@ class LLMAgent:
 
     def fast_action(self, obs: Observation):
 
-        print(f"fast action: next act: {self.next_act}")
+        #print(f"fast action: next act: {self.next_act}")
         if self.next_act:
             if self.next_act.startswith("next_turn_choose"):
                 card_name = self.next_act.split(" ")[1]
@@ -248,7 +270,8 @@ class LLMAgent:
 
         ctx["available_command"] = [i for i in obs._available_commands if not i in self.skip_commands]
         ctx["choice_list"] = obs.choice_list
-        print(json.dumps(ctx))
+        self.logger.note(str(obs.choice_list))
+        print(json.dumps(ctx, indent=4))
 
         act = self.evaluate_llm(ctx)
 
@@ -284,6 +307,7 @@ class LLMAgent:
 
         ctx["available_command"] = [i for i in obs._available_commands if not i in self.skip_commands]
         ctx["choice_list"] = [{"id": i, "name": c} for i, c in enumerate(obs.choice_list)]
+        self.logger.note(str(obs.choice_list))
         print(json.dumps(ctx))
 
         act = self.evaluate_llm(ctx)
@@ -300,6 +324,7 @@ class LLMAgent:
 
         ctx["available_command"] = [i for i in obs._available_commands if not i in self.skip_commands]
         ctx["choice_list"] = [{"id": i, "name": c} for i, c in enumerate(obs.choice_list)]
+        self.logger.note(str(obs.choice_list))
         print(json.dumps(ctx))
 
         act = self.evaluate_llm(ctx)
@@ -317,6 +342,7 @@ class LLMAgent:
 
         ctx["available_command"] = [i for i in obs._available_commands if not i in self.skip_commands]
         ctx["choice_list"] = [{"id": i, "name": c} for i, c in enumerate(obs.choice_list)]
+        self.logger.note(str(obs.choice_list))
         print(json.dumps(ctx))
 
         act = self.evaluate_llm(ctx)
@@ -340,6 +366,7 @@ class LLMAgent:
 
         ctx["available_command"] = [i for i in obs._available_commands if not i in self.skip_commands]
         ctx["choice_list"] = [{"id": i, "name": c} for i, c in enumerate(obs.choice_list)]
+        self.logger.note(str(obs.choice_list))
         print(json.dumps(ctx))
 
         act = self.evaluate_llm(ctx)
@@ -349,6 +376,7 @@ class LLMAgent:
     def _action_hand_select(self, obs: Observation):
         # no change state, in order to keep the context
 
+        print("in action_hand_select")
         ctx = self.get_general_info(obs.persistent_state.readable())
         act = self.evaluate_llm(ctx)
 

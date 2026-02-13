@@ -4,6 +4,7 @@ class LLMModel:
     def __init__(self, url="", key="", model=""):
         model = "gemini-3-flash-preview"
         url = "https://generativelanguage.googleapis.com/v1beta/openai/"
+        key = "AIzaSyCmB2rVVYG7yEJihZhiZ5o1Qht0GMSC84I"
 
         self.client = OpenAI(
             api_key=key,

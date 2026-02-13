@@ -17,20 +17,24 @@ def main():
     parser.add_argument("lib_dir")
     parser.add_argument("mods_dir")
     parser.add_argument("out_dir")
+    parser.add_argument("log_dir")
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--build_image", action="store_true")
     args = parser.parse_args()
 
-    agent = LLMAgent()
+    agent = LLMAgent(args.log_dir)
 
     env = SlayTheSpireGymEnv(
         args.lib_dir, args.mods_dir, args.out_dir, headless=args.headless,
         character= agent.character, ascension=agent.ascension, sts_seed = "0"
     )
-    observation = env.reset(seed=0)
+    observation = env.reset(seed=(int)(args.log_dir))
 
     action = "choose 0" # click start
     while True:
+        if action == "over": # Game Over
+            break
+
         observation = env._do_action(action)
         observation = env._do_action("state")
 

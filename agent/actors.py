@@ -6,11 +6,11 @@ import re
 
 BIN = "/Users/lancefang/work/va/3rd/sts_lightspeed/build/battle-sim"
 class Actor:
-    def __init__(self, state: ContextState):
-        pass
+    def __init__(self, state: ContextState, log_dir: str):
+        self.log_dir = log_dir
 
     def get_action(self, obs: Observation, room_num, room_step):
-        state_file = f"logs/{room_num}-{room_step}.json"
+        state_file = f"{self.log_dir}/{room_num}-{room_step}.json"
         with open(state_file, "w") as f:
             f.write(json.dumps(obs.state))
         acts_str = wrapper(BIN, state_file)
