@@ -178,7 +178,9 @@ class LLMAgent:
     def get_general_info(self, info: dict) -> dict:
 
         deck = info.get("deck")
-        deck_info = [self.db.query_card(i.get("name")) for i in deck]
+        names = [i.get("name") for i in deck]
+        names = list(set(names))
+        deck_info = [self.db.query_card(i) for i in names]
         info["deck_info"] = deck_info
 
         relics = info.get("relics")
@@ -186,8 +188,10 @@ class LLMAgent:
         info["relic_info"] = relic_info
 
         potions = info.get("potions")
-        potion_info = [self.db.query_potion(i.get("potion")) for i in potions if i.get("potion") != "Potion Slot"]
-        if potion_info:
+        names = [i.get("potion") for i in potions if i.get("potion") != "Potion Slot"]
+        names = list(set(names))
+        if names:
+            potion_info = [self.db.query_potion(i) for i in names]
             info["potion_info"] = relic_info
 
         return info
@@ -290,6 +294,10 @@ class LLMAgent:
     def _action_reward(self, obs: Observation):
         self._enter_state(ContextState.REWARD)
 
+        rewards = obs.combat_reward_state.readable()
+        print(rewards)
+        if rewards and rewards[0].get("type") == "POTION":
+            print("ASK LLM FOR HELP")
         # select reward one by one
         act = "choose 0"
 
@@ -304,11 +312,16 @@ class LLMAgent:
         ctx["choose_strategy"] = self.deck_eval(ctx)
 
         ctx["card_reward"] = obs.card_reward_state.readable()
+        cards = obs.card_reward_state.readable().get("cards")
+        card_names = [i.get("name") for i in cards]
+        card_names = list(set(card_names))
+        card_info = [self.db.query_card(i) for i in card_names]
+        ctx["card_reward"]["card_info"] = card_info
 
         ctx["available_command"] = [i for i in obs._available_commands if not i in self.skip_commands]
         ctx["choice_list"] = [{"id": i, "name": c} for i, c in enumerate(obs.choice_list)]
         self.logger.note(str(obs.choice_list))
-        print(json.dumps(ctx))
+        print(json.dumps(ctx, indent=4))
 
         act = self.evaluate_llm(ctx)
         if act == "skip":

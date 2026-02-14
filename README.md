@@ -20,6 +20,8 @@ cmake .. -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
 ## todo
 
-- StS DB
-- potion discard when slot is full
-- GameOver
+- in potion reward, add a request to LLM if slot is full
+- combat:
+    - ask llm to use a potion or not at the beginning
+    - if search is -1, ask llm for an action(maybe here is better place to use potion?)
+- add a dataset of combat to evaluate search abilities
