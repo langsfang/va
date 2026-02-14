@@ -6,11 +6,12 @@ from prompts.event import EVENT_PROMPT
 from prompts.reward import REWARD_PROMPT
 from prompts.rest import REST_PROMPT
 from prompts.shop import SHOP_PROMPT
+from prompts.map import MAP_PROMPT
 from prompts.deck_eval import DECK_EVAL_PROMPT
 
 from model import LLMModel
 from map_feature import get_path_features
-from actors import Actor
+from actors import CombatActor, MapActor
 from utils import extract_json
 from db import StSDB
 
@@ -36,6 +37,7 @@ class LLMAgent:
             ContextState.REWARD : REWARD_PROMPT,
             ContextState.REST : REST_PROMPT,
             ContextState.SHOP : SHOP_PROMPT,
+            ContextState.MAP : MAP_PROMPT,
         }
         import os
         cdir = os.getcwd()
@@ -203,23 +205,30 @@ class LLMAgent:
             return
         self.state = new_state
         self.hist.clear()
-        self.actor = Actor(new_state, self.log_dir)
+        self.actor = CombatActor(new_state, self.log_dir)
 
     def _action_map(self, obs: Observation):
         self._enter_state(ContextState.MAP)
 
-        self.logger.note(f"new room {self.room_num}")
-        ctx = self.get_ctx()
-        ctx["game_state"] = self.get_general_info(obs.persistent_state.readable())
-        ctx["map_feature"] = get_path_features(obs.state.get("game_state").get("map"), 0, 0)
+        mapactor = MapActor(obs.state)
 
-        print(json.dumps(ctx))
-        self.logger.note(ctx.get("game_state").get("health"))
+        #ctx = self.get_ctx()
+        #ctx["game_state"] = self.get_general_info(obs.persistent_state.readable())
+        #ctx["choice_list"] = mapactor.get_path_info()
 
-        # act = self.evaluate_llm(ctx)
-        act = "choose 0"
+        #self.logger.note(f"new room {self.room_num}")
+        #self.logger.note(ctx.get("game_state").get("health"))
+        ## print(json.dumps(ctx))
 
-        return act
+        #act = self.evaluate_llm(ctx)
+        #print("llm: ", act)
+        #path_idx = int(act.split(" ")[1])
+
+        #return mapactor.get_action(path_idx)
+        return mapactor.get_action(0)
+
+        # act = "choose 0"
+        # return act
 
     def fast_action(self, obs: Observation):
 
