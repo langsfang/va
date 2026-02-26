@@ -194,7 +194,7 @@ class LLMAgent:
         names = list(set(names))
         if names:
             potion_info = [self.db.query_potion(i) for i in names]
-            info["potion_info"] = relic_info
+            info["potion_info"] = potion_info
 
         return info
 
@@ -293,10 +293,20 @@ class LLMAgent:
     def _action_combat(self, obs: Observation):
         self._enter_state(ContextState.COMBAT)
 
-        act, self.next_act = self.actor.get_action(obs, self.room_num, self.room_step)
+        ctx = self.get_ctx()
+        ctx["game_state"] = self.get_general_info(obs.persistent_state.readable())
 
-        #ctx = self.get_general_info(obs.persistent_state.readable())
-        #act = self.evaluate_llm(ctx)
+        combat = obs.combat_state.readable()
+        combat["enemy_desc"] = [self.db.query_monster(e.get("enemy").get("name")) for e in combat.get("enemies")]
+        ctx["combat_state"] = combat
+
+        ctx["available_command"] = [i for i in obs._available_commands if not i in self.skip_commands]
+        ctx["choice_list"] = [{"id": i, "name": c} for i, c in enumerate(obs.choice_list)]
+
+        print(json.dumps(ctx, indent=4))
+
+        act, self.next_act = self.actor.get_action(obs, ctx, self.room_num, self.room_step)
+
         self.room_step += 1
         return act
 

@@ -10,6 +10,8 @@ class StSDB:
         self.potions = pd.read_csv(f"{info_dir}/potions.csv")
 
     def query_card(self, name: str):
+        if name.endswith('+'):
+            name = name[:-1]
         result = self.cards[self.cards['Name'] == name]
 
         if not result.empty:
@@ -34,14 +36,7 @@ class StSDB:
             return None
 
     def query_monster(self, name: str):
-        result = self.monsters[self.monsters['Name'] == name]
-
-        if not result.empty:
-            return result.iloc[0].to_dict()
-        else:
-            return None
-
-        monster_dict = {
+        monster_names = {
             "GremlinNob":"GREMLIN_NOB",
             "GremlinTsundere":"MAD_GREMLIN",
             "FungiBeast":"FUNGI_BEAST",
@@ -111,4 +106,11 @@ class StSDB:
             "SpireSpear":"SPIRE_SPEAR",
             "CorruptHeart":"CORRUPT_HEART",
         }
+        name = monster_names.get(name)
 
+        result = self.monsters[self.monsters['Name'] == name]
+
+        if not result.empty:
+            return result.iloc[0].to_dict()
+        else:
+            return None
