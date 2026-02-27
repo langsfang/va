@@ -30,7 +30,7 @@ def main():
     )
     observation = env.reset(seed=(int)(args.log_dir))
 
-    action = "choose 0" # click start
+    action = "state" # click start
     while True:
         if action == "over": # Game Over
             break

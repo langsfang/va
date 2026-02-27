@@ -7,6 +7,7 @@ from prompts.reward import REWARD_PROMPT
 from prompts.rest import REST_PROMPT
 from prompts.shop import SHOP_PROMPT
 from prompts.map import MAP_PROMPT
+from prompts.combat import COMBAT_PROMPT
 from prompts.deck_eval import DECK_EVAL_PROMPT
 
 from model import LLMModel
@@ -38,6 +39,7 @@ class LLMAgent:
             ContextState.REST : REST_PROMPT,
             ContextState.SHOP : SHOP_PROMPT,
             ContextState.MAP : MAP_PROMPT,
+            ContextState.COMBAT : COMBAT_PROMPT,
         }
         import os
         cdir = os.getcwd()
@@ -82,6 +84,10 @@ class LLMAgent:
         if self.logger.need_replay():
             return self.logger.replay()
 
+        if obs.screen_type == "MAP":
+            self.logger.note(f"new room {self.room_num}")
+            self.logger.note(obs.persistent_state.readable().get("health"))
+
         act = self.fast_action(obs) # no need for LLM
         if act:
             self.logger.add(act)
@@ -98,7 +104,7 @@ class LLMAgent:
 
         data = None
 
-        start_index = resp.find(target_key)
+        start_index = resp.rfind(target_key)
         if start_index == -1:
             return ""
         colon_index = resp.find(":", start_index)
@@ -118,18 +124,27 @@ class LLMAgent:
             return ""
 
         action = data.get("action")
-        if action == "potion":
+        if action == "play":
+            idx = data.get("index")
+            target = data.get("target_id")
+            ret = f"{action} {idx}"
+            if target is not None:
+                ret += f" {target}"
+        elif action == "potion":
             use = data.get("type")
             slot = data.get("potion_slot")
+            target = data.get("target_id")
             ret = f"{action} {use} {slot}"
-        elif action == "skip":
-            ret = "skip"
-        else:
+            if target is not None:
+                ret += f" {target}"
+        elif action == "choose":
             idx = data.get("id")
             if idx is not None:
                 ret = f"{action} {idx}"
             else:
                 ret = f"{action}"
+        else: # "end/leave/skip"
+            ret = action 
 
         return ret
     
@@ -160,16 +175,15 @@ class LLMAgent:
 
         self.hist.append({"role": "user", "content": user})
 
+        llm = LLMModel()
+
+        answer = llm.llm_stream(self.hist)
+        self.hist.append({"role": "assistant", "content": answer})
         # dump prompt
         with open(f"{self.log_dir}/{self.room_num}-{self.room_step}-{self.state}", "w") as fn:
             for msg in self.hist:
                 fn.write(f"----{msg.get('role')}---\n")
                 fn.write(msg.get("content"))
-            
-        llm = LLMModel()
-
-        answer = llm.llm_stream(self.hist)
-        self.hist.append({"role": "assistant", "content": answer})
 
         act = self.extract_action(answer)
         print(act)
@@ -232,6 +246,9 @@ class LLMAgent:
 
     def fast_action(self, obs: Observation):
 
+        if obs.screen_type == "GAME_OVER":
+            return self._action_game_over(obs)
+
         #print(f"fast action: next act: {self.next_act}")
         if self.next_act:
             if self.next_act.startswith("next_turn_choose"):
@@ -249,11 +266,11 @@ class LLMAgent:
         ac = [i for i in obs._available_commands if not i in self.skip_commands]
         cl = obs.choice_list
 
-        print("="*10)
-        print(ac)
-        print("="*10)
-        print(cl)
-        print("="*10)
+        #print("="*10)
+        #print(ac)
+        #print("="*10)
+        #print(cl)
+        #print("="*10)
 
         ret = ""
         if len(cl) == 0:
@@ -293,32 +310,52 @@ class LLMAgent:
     def _action_combat(self, obs: Observation):
         self._enter_state(ContextState.COMBAT)
 
-        ctx = self.get_ctx()
-        ctx["game_state"] = self.get_general_info(obs.persistent_state.readable())
+        act, next_act, score = self.actor.get_action(obs, self.room_num, self.room_step)
+        if score > -0.98:
+            self.next_act = next_act
+            self.hist.clear()
+        else:
+            ctx = self.get_ctx()
+            ctx["game_state"] = self.get_general_info(obs.persistent_state.readable())
 
-        combat = obs.combat_state.readable()
-        combat["enemy_desc"] = [self.db.query_monster(e.get("enemy").get("name")) for e in combat.get("enemies")]
-        ctx["combat_state"] = combat
+            combat = obs.combat_state.readable()
+            combat["enemy_desc"] = [self.db.query_monster(e.get("enemy").get("name")) for e in combat.get("enemies")]
+            ctx["combat_state"] = combat
 
-        ctx["available_command"] = [i for i in obs._available_commands if not i in self.skip_commands]
-        ctx["choice_list"] = [{"id": i, "name": c} for i, c in enumerate(obs.choice_list)]
+            ctx["available_command"] = [i for i in obs._available_commands if not i in self.skip_commands]
+            ctx["choice_list"] = [{"id": i, "name": c} for i, c in enumerate(obs.choice_list)]
 
-        print(json.dumps(ctx, indent=4))
-
-        act, self.next_act = self.actor.get_action(obs, ctx, self.room_num, self.room_step)
+            #print(json.dumps(ctx, indent=4))
+            act = self.evaluate_llm(ctx)
 
         self.room_step += 1
         return act
 
+    def _potion_full(self, obs:Observation):
+        info = obs.persistent_state.readable()
+
+        potions = info.get("potions")
+        slots = [i.get("potion") for i in potions if i.get("potion") == "Potion Slot"]
+
+        return len(slots) == 0
+
     def _action_reward(self, obs: Observation):
         self._enter_state(ContextState.REWARD)
 
+        # select reward one by one
+        act = "choose 0"
+
+        # if potion slot full, skip potion
         rewards = obs.combat_reward_state.readable()
         print(rewards)
         if rewards and rewards[0].get("type") == "POTION":
-            print("ASK LLM FOR HELP")
-        # select reward one by one
-        act = "choose 0"
+            print("ASK LLM FOR HELP", rewards[0])
+            #{'type': 'POTION', 'value': 'Explosive Potion'}
+            if self._potion_full(obs):
+                if len(rewards) > 1: # choose next one
+                    act = "choose 1"
+                else:
+                    act = "proceed"
 
         return act
 
@@ -409,7 +446,10 @@ class LLMAgent:
         # no change state, in order to keep the context
 
         print("in action_hand_select")
-        ctx = self.get_general_info(obs.persistent_state.readable())
+        ctx = self.get_ctx()
+        ctx["available_command"] = [i for i in obs._available_commands if not i in self.skip_commands]
+        ctx["choice_list"] = [{"id": i, "name": c} for i, c in enumerate(obs.choice_list)]
+
         act = self.evaluate_llm(ctx)
 
         return act

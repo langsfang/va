@@ -19,7 +19,7 @@ class Logger:
 
         self.all_lines.append(log)
         
-        self._append_to_file(log)
+        self._append_to_file(f'"{log}"')
 
     def note(self, note: str):
         """增加一条 note，并立即下盘"""
@@ -55,11 +55,22 @@ class Logger:
         with open(self.filename, 'r', encoding='utf-8') as f:
             for line in f:
                 content = line.rstrip('\n')
+                if not content:
+                    continue
                 
-                self.all_lines.append(content)
-                
-                if not content.startswith('#'):
+                # 如果以 # 开头，说明是 note
+                if content.startswith('#'):
+                    self.all_lines.append(content)
+                else:
+                    # 否则是 log，安全地去除首尾的引号
+                    if (content.startswith('"') and content.endswith('"')) or \
+                       (content.startswith("'") and content.endswith("'")):
+                        content = content[1:-1]
+                        
                     self.logs.append(content)
+                    self.all_lines.append(content)
+
+        print(f"restored {len(self.logs)} logs and {len(self.all_lines)-len(self.logs)} notes")
 
     def _append_to_file(self, content: str):
         with open(self.filename, 'a', encoding='utf-8') as f:

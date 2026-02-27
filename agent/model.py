@@ -3,6 +3,7 @@ from openai import OpenAI
 class LLMModel:
     def __init__(self, url="", key="", model=""):
         model = "gemini-3-flash-preview"
+        #model = "gemini-3.1-pro-preview"
         url = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
         self.client = OpenAI(
