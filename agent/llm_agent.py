@@ -266,11 +266,10 @@ class LLMAgent:
         ac = [i for i in obs._available_commands if not i in self.skip_commands]
         cl = obs.choice_list
 
-        #print("="*10)
-        #print(ac)
-        #print("="*10)
-        #print(cl)
-        #print("="*10)
+        print("="*10)
+        print(ac)
+        print(cl)
+        print("="*10)
 
         ret = ""
         if len(cl) == 0:
@@ -285,7 +284,11 @@ class LLMAgent:
             if "confirm" in ac:
                 ret = "confirm"
             elif "choose" in ac and len(cl) == 1:
-                ret = "choose 0"
+                # in reward select and potion slot full
+                if cl[0] == "potion":
+                    ret = "" # handle it in reward action
+                else:
+                    ret = "choose 0"
 
         if ret == "leave" and obs.screen_type == "SHOP_SCREEN":
             self.next_act = "proceed"
