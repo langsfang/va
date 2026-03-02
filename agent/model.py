@@ -5,6 +5,7 @@ class LLMModel:
         model = "gemini-3-flash-preview"
         #model = "gemini-3.1-pro-preview"
         url = "https://generativelanguage.googleapis.com/v1beta/openai/"
+        key = "AIzaSyAYB_7Bb_D-wLRNvT42VeTRKYDT0hlCaCc"
 
         self.client = OpenAI(
             api_key=key,

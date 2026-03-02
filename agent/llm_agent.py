@@ -314,7 +314,7 @@ class LLMAgent:
         self._enter_state(ContextState.COMBAT)
 
         act, next_act, score = self.actor.get_action(obs, self.room_num, self.room_step)
-        if score > -0.98:
+        if score > -1.99:
             self.next_act = next_act
             self.hist.clear()
         else:
