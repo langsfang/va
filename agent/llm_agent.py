@@ -23,6 +23,7 @@ class LLMAgent:
             "MAP" : self._action_map,
             "COMBAT_REWARD" : self._action_reward,
             "CARD_REWARD" : self._action_card_reward,
+            "BOSS_REWARD" : self._action_boss_reward,
             "REST" : self._action_rest,
             "SHOP_ROOM" : self._action_shop,
             "SHOP_SCREEN" : self._action_shop,
@@ -252,11 +253,16 @@ class LLMAgent:
         #print(f"fast action: next act: {self.next_act}")
         if self.next_act:
             if self.next_act.startswith("next_turn_choose"):
-                card_name = self.next_act.split(" ")[1]
+                idx = self.next_act.find(" ")
+                card_name = self.next_act[idx+1:]
+                print(f"find {card_name} in {obs.choice_list}")
                 for i, name in enumerate(obs.choice_list):
                     if card_name == name:
                         self.next_act = None
                         return f"choose {i}"
+
+                if len(obs.choice_list) > 1:
+                    return "choose 0"
                 assert(False)
 
             act = self.next_act
@@ -359,6 +365,30 @@ class LLMAgent:
                     act = "choose 1"
                 else:
                     act = "proceed"
+
+        return act
+
+    def _action_boss_reward(self, obs: Observation):
+        self._enter_state(ContextState.REWARD)
+
+        ctx = self.get_ctx()
+        ctx["game_state"] = self.get_general_info(obs.persistent_state.readable())
+
+        ctx["choose_strategy"] = self.deck_eval(ctx)
+
+        ctx["relic_reward"] = obs.combat_reward_state.readable()
+        relic_names = [i.get("value") for i in ctx["relic_reward"]]
+        relic_info = [self.db.query_relic(i) for i in relic_names]
+        ctx["relic_reward_info"] = relic_info
+
+        ctx["available_command"] = [i for i in obs._available_commands if not i in self.skip_commands]
+        ctx["choice_list"] = [{"id": i, "name": c} for i, c in enumerate(obs.choice_list)]
+        self.logger.note(str(obs.choice_list))
+        print(json.dumps(ctx, indent=4))
+
+        act = self.evaluate_llm(ctx)
+        if act == "skip":
+            self.next_act = "proceed"
 
         return act
 

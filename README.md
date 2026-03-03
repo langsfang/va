@@ -26,3 +26,6 @@ cmake .. -DCMAKE_POLICY_VERSION_MINIMUM=3.5
     - if search is -1, ask llm for an action(maybe here is better place to use potion?)
 - add a dataset of combat to evaluate search abilities
 - add map decision
+- prompts
+    - refine all prompts
+    - reward include relic selection

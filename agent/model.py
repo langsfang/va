@@ -1,10 +1,11 @@
 from openai import OpenAI
+import os
 
 class LLMModel:
     def __init__(self, url="", key="", model=""):
-        model = "gemini-3-flash-preview"
-        #model = "gemini-3.1-pro-preview"
-        url = "https://generativelanguage.googleapis.com/v1beta/openai/"
+        model = os.getenv('MODEL')
+        url = os.getenv('MODEL_URL')
+        key = os.getenv('API_KEY') 
 
         self.client = OpenAI(
             api_key=key,
