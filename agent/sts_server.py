@@ -91,6 +91,7 @@ def main() -> None:
     parser.add_argument("--character", default="IRONCLAD")
     parser.add_argument("--ascension", type=int, default=20)
     parser.add_argument("--sts-seed", default="0")
+    parser.add_argument("--timeout", type=float, default=30.0)
     args = parser.parse_args()
 
     env = SlayTheSpireGymEnv(
@@ -101,6 +102,7 @@ def main() -> None:
         character=args.character,
         ascension=args.ascension,
         sts_seed=args.sts_seed,
+        communication_timeout=args.timeout,
     )
 
     with StsServer((args.host, args.port), StsRequestHandler, env) as server:
